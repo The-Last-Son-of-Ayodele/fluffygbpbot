@@ -27,25 +27,27 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if account:
-            # Try multiple possible ways to get balance
-            try:
-                info = await account.get_account_information()
-                balance = info.balance
-            except:
-                try:
-                    state = await account.get_state()
-                    balance = state.balance if hasattr(state, 'balance') else "N/A"
-                except:
-                    balance = "N/A (check connection)"
-            
+        if not account:
+            await update.message.reply_text("Not connected to broker.")
+            return
+
+        # Get account info safely
+        try:
+            info = await account.get_account_information()
+            balance = getattr(info, 'balance', 'N/A')
+        except:
+            balance = 'N/A'
+
+        # Get positions safely
+        try:
             positions = await account.get_positions()
-            await update.message.reply_text(f"Balance: ${balance}\nPositions: {len(positions)}")
-        else:
-            await update.message.reply_text("Not connected.")
+            pos_count = len(positions)
+        except:
+            pos_count = 'N/A'
+
+        await update.message.reply_text(f"Balance: ${balance}\nPositions: {pos_count}")
     except Exception as e:
-        logger.error(f"Status error: {e}")
-        await update.message.reply_text(f"Status error: {str(e)[:100]}")
+        await update.message.reply_text(f"Status error: {str(e)[:120]}")
 
 async def main():
     global account
