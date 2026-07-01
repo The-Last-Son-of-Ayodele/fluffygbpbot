@@ -5,124 +5,61 @@ from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-# =========================
-# Logging
-# =========================
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# =========================
-# Environment Variables
-# =========================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 METAAPI_TOKEN = os.getenv("METAAPI_TOKEN")
 ACCOUNT_ID = os.getenv("ACCOUNT_ID")
 
-# =========================
-# Global Variables
-# =========================
 account = None
-connection = None
 is_active = False
 
-
-# =========================
-# Telegram Commands
-# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
-
     is_active = True
-    await update.message.reply_text(
-        "✅ CrossInTrend Bot Started\n"
-        "Monitoring market..."
-    )
-
+    await update.message.reply_text("✅ CrossInTrend Bot Started on GBPUSD")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
-
     is_active = False
     await update.message.reply_text("⛔ Bot Stopped")
 
-
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global connection
-
     try:
-        if connection is None:
-            await update.message.reply_text("❌ MetaApi not connected.")
-            return
-
-        account_info = await connection.get_account_information()
-        positions = await connection.get_positions()
-
-        message = (
-            "📈 CrossInTrend Bot Status\n\n"
-            f"💰 Balance: ${account_info['balance']:.2f}\n"
-            f"📊 Equity: ${account_info['equity']:.2f}\n"
-            f"🛡 Free Margin: ${account_info['freeMargin']:.2f}\n"
-            f"📌 Open Positions: {len(positions)}\n"
-            f"🤖 Trading: {'ON' if is_active else 'OFF'}"
-        )
-
-        await update.message.reply_text(message)
-
+        if account:
+            info = await account.get_account_information()
+            positions = await account.get_positions()
+            await update.message.reply_text(f"Balance: ${info.balance:.2f}\nPositions: {len(positions)}")
+        else:
+            await update.message.reply_text("Not connected.")
     except Exception as e:
-        logger.exception(e)
-        await update.message.reply_text(f"❌ Error:\n{e}")
+        logger.error(f"Status error: {e}")
+        await update.message.reply_text(f"Error getting status: {str(e)[:100]}")
 
-
-# =========================
-# MetaApi Connection
-# =========================
-async def connect_metaapi():
-    global account, connection
-
-    api = MetaApi(METAAPI_TOKEN)
-
-    account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
-
-    if account.state != "DEPLOYED":
-        logger.info("Deploying account...")
-        await account.deploy()
-
-    logger.info("Waiting for broker connection...")
-    await account.wait_connected()
-
-    connection = account.get_rpc_connection()
-
-    await connection.connect()
-    await connection.wait_synchronized()
-
-    logger.info("✅ MetaApi Connected Successfully")
-
-
-# =========================
-# Main
-# =========================
 async def main():
-
-    await connect_metaapi()
+    global account
+    try:
+        api = MetaApi(METAAPI_TOKEN)
+        account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
+        await account.wait_connected()
+        logger.info("✅ Successfully connected to MetaApi")
+        await asyncio.sleep(2)  # Small delay
+    except Exception as e:
+        logger.error(f"Connection failed: {e}")
+        return
 
     app = Application.builder().token(TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(CommandHandler("status", status))
-
-    logger.info("🤖 Telegram Bot Started")
 
     await app.initialize()
     await app.start()
     await app.updater.start_polling()
 
-    # Keep bot alive
-    await asyncio.Event().wait()
-
+    while True:
+        await asyncio.sleep(60)
 
 if __name__ == "__main__":
     asyncio.run(main())
