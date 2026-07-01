@@ -28,6 +28,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
+            # Correct SDK methods
             info = await account.get_account_information()
             positions = await account.get_positions()
             await update.message.reply_text(f"Balance: ${info.balance:.2f}\nPositions: {len(positions)}")
@@ -35,7 +36,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Not connected.")
     except Exception as e:
         logger.error(f"Status error: {e}")
-        await update.message.reply_text(f"Error getting status: {str(e)[:100]}")
+        await update.message.reply_text(f"Error: {str(e)[:150]}")
 
 async def main():
     global account
@@ -43,8 +44,7 @@ async def main():
         api = MetaApi(METAAPI_TOKEN)
         account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
         await account.wait_connected()
-        logger.info("✅ Successfully connected to MetaApi")
-        await asyncio.sleep(2)  # Small delay
+        logger.info("✅ Connected to MetaApi")
     except Exception as e:
         logger.error(f"Connection failed: {e}")
         return
