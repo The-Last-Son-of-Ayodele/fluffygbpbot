@@ -28,17 +28,23 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
-            # Try different possible methods
+            # Try multiple possible ways to get balance
             try:
                 info = await account.get_account_information()
+                balance = info.balance
             except:
-                info = await account.get_state()  # alternative
+                try:
+                    state = await account.get_state()
+                    balance = state.balance if hasattr(state, 'balance') else "N/A"
+                except:
+                    balance = "N/A (check connection)"
+            
             positions = await account.get_positions()
-            balance = info.balance if hasattr(info, 'balance') else "N/A"
             await update.message.reply_text(f"Balance: ${balance}\nPositions: {len(positions)}")
         else:
             await update.message.reply_text("Not connected.")
     except Exception as e:
+        logger.error(f"Status error: {e}")
         await update.message.reply_text(f"Status error: {str(e)[:100]}")
 
 async def main():
