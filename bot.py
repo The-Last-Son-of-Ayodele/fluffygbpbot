@@ -67,20 +67,3 @@ async def main():
             account = None
             await asyncio.sleep(10)
             # Keep alive for Railway
-import http.server
-import socketserver
-import threading
-
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-
-def start_server():
-    with socketserver.TCPServer(("", 8000), Handler) as httpd:
-        httpd.serve_forever()
-
-threading.Thread(target=start_server, daemon=True).start()
-        
-        await asyncio.sleep(30)  # Check every 30 seconds
