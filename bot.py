@@ -51,26 +51,20 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     global account
-    try:
-        api = MetaApi(METAAPI_TOKEN)
-        account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
-        await account.wait_connected()
-        logger.info("✅ Connected to MetaApi")
-    except Exception as e:
-        logger.error(f"Connection failed: {e}")
-        return
-
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stop", stop))
-    app.add_handler(CommandHandler("status", status))
-
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-
     while True:
-        await asyncio.sleep(60)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        try:
+            if account is None:
+                api = MetaApi(METAAPI_TOKEN)
+                account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
+                await account.wait_connected()
+                logger.info("✅ Reconnected to MetaApi")
+            
+            # Keep connection alive
+            await account.get_account_information()
+            
+        except Exception as e:
+            logger.error(f"Reconnect error: {e}")
+            account = None
+            await asyncio.sleep(10)
+        
+        await asyncio.sleep(30)  # Check every 30 seconds
