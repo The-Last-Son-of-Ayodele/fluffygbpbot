@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 METAAPI_TOKEN = os.getenv("METAAPI_TOKEN")
 ACCOUNT_ID = os.getenv("ACCOUNT_ID")
+SYMBOL = "GBPUSD"
 
 account = None
 is_active = False
@@ -31,23 +32,14 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Not connected to broker.")
             return
 
-        # Get account info safely
-        try:
-            info = await account.get_account_information()
-            balance = getattr(info, 'balance', 'N/A')
-        except:
-            balance = 'N/A'
-
-        # Get positions safely
-        try:
-            positions = await account.get_positions()
-            pos_count = len(positions)
-        except:
-            pos_count = 'N/A'
-
-        await update.message.reply_text(f"Balance: ${balance}\nPositions: {pos_count}")
+        # Safe account info
+        info = await account.get_account_information()
+        positions = await account.get_positions()
+        balance = getattr(info, 'balance', 'N/A')
+        await update.message.reply_text(f"Balance: ${balance}\nPositions: {len(positions)}")
     except Exception as e:
-        await update.message.reply_text(f"Status error: {str(e)[:120]}")
+        logger.error(f"Status error: {e}")
+        await update.message.reply_text(f"Error: {str(e)[:150]}")
 
 async def main():
     global account
@@ -57,13 +49,27 @@ async def main():
                 api = MetaApi(METAAPI_TOKEN)
                 account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
                 await account.wait_connected()
-                logger.info("✅ Reconnected to MetaApi")
+                logger.info("✅ Connected to MetaApi")
             
             # Keep connection alive
             await account.get_account_information()
             
         except Exception as e:
-            logger.error(f"Reconnect error: {e}")
+            logger.error(f"Connection error: {e}")
             account = None
             await asyncio.sleep(10)
-            # Keep alive for Railway
+        
+        await asyncio.sleep(30)
+
+    # Telegram bot
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("status", status))
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
