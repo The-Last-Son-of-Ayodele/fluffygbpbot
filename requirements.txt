@@ -1,3 +1,3 @@
-metaapi-cloud-sdk
+metaapi-cloud-sdk==29.1.1
 python-telegram-bot==20.8
 aiohttp==3.9.5
