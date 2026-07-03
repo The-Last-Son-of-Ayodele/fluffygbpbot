@@ -43,25 +43,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     global account
-    while True:
-        try:
-            if account is None:
-                api = MetaApi(METAAPI_TOKEN)
-                account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
-                await account.wait_connected()
-                logger.info("✅ Connected to MetaApi")
-            
-            # Keep connection alive
-            await account.get_account_information()
-            
-        except Exception as e:
-            logger.error(f"Connection error: {e}")
-            account = None
-            await asyncio.sleep(10)
-        
-        await asyncio.sleep(30)
+    api = MetaApi(METAAPI_TOKEN)
+    account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
+    await account.wait_connected()
+    logger.info("✅ Connected to MetaApi")
 
-    # Telegram bot
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
@@ -71,5 +57,6 @@ async def main():
     await app.start()
     await app.updater.start_polling()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    # Simple keep alive
+    while True:
+        await asyncio.sleep(60)
