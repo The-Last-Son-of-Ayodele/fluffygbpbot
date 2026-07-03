@@ -43,7 +43,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def test_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
-            await account.create_market_buy(SYMBOL, LOT)
+            await account.create_market_buy_order(SYMBOL, LOT)
             await update.message.reply_text("🟢 Test BUY order placed on GBPUSD")
         else:
             await update.message.reply_text("Not connected.")
@@ -53,7 +53,7 @@ async def test_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def test_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
-            await account.create_market_sell(SYMBOL, LOT)
+            await account.create_market_sell_order(SYMBOL, LOT)
             await update.message.reply_text("🔴 Test SELL order placed on GBPUSD")
         else:
             await update.message.reply_text("Not connected.")
@@ -81,7 +81,7 @@ async def main():
     while True:
         await asyncio.sleep(60)
 
-# Health check for Railway
+# Health check
 class HealthHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
