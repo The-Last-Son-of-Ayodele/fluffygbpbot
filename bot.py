@@ -2,7 +2,9 @@ import os
 import asyncio
 import logging
 import signal
-signal.signal(signal.SIGTERM, lambda s, f: asyncio.get_event_loop().stop())
+import http.server
+import socketserver
+import threading
 from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -10,6 +12,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Config
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 METAAPI_TOKEN = os.getenv("METAAPI_TOKEN")
 ACCOUNT_ID = os.getenv("ACCOUNT_ID")
@@ -34,7 +37,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Not connected to broker.")
             return
 
-        # Safe account info
         info = await account.get_account_information()
         positions = await account.get_positions()
         balance = getattr(info, 'balance', 'N/A')
@@ -45,11 +47,16 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     global account
-    api = MetaApi(METAAPI_TOKEN)
-    account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
-    await account.wait_connected()
-    logger.info("✅ Connected to MetaApi")
+    try:
+        api = MetaApi(METAAPI_TOKEN)
+        account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
+        await account.wait_connected()
+        logger.info("✅ Connected to MetaApi")
+    except Exception as e:
+        logger.error(f"Connection failed: {e}")
+        return
 
+    # Telegram Bot
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
@@ -58,11 +65,12 @@ async def main():
     await app.initialize()
     await app.start()
     await app.updater.start_polling()
-    # Health check to prevent Railway sleep
-import http.server
-import socketserver
-import threading
 
+    # Keep alive
+    while True:
+        await asyncio.sleep(60)
+
+# Health check server for Railway
 class HealthHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -73,10 +81,9 @@ def run_health_server():
     with socketserver.TCPServer(("", 8000), HealthHandler) as httpd:
         httpd.serve_forever()
 
-threading.Thread(target=run_health_server, daemon=True).start()
-
-    # Simple keep alive
-    while True:
-        await asyncio.sleep(60)
-        if __name__ == "__main__":
+if __name__ == "__main__":
+    # Start health check in background
+    threading.Thread(target=run_health_server, daemon=True).start()
+    # Handle graceful shutdown
+    signal.signal(signal.SIGTERM, lambda s, f: asyncio.get_event_loop().stop())
     asyncio.run(main())
