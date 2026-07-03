@@ -15,10 +15,8 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 METAAPI_TOKEN = os.getenv("METAAPI_TOKEN")
 ACCOUNT_ID = os.getenv("ACCOUNT_ID")
-PORT = int(os.getenv("PORT", 8000))
 
 account = None
-connection = None  # RPC connection - required for get_account_information/get_positions
 is_active = False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -32,72 +30,24 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⛔ Bot Stopped")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not connection:
-        await update.message.reply_text("Not connected.")
-        return
-
     try:
-        info = await connection.get_account_information()
-        # info is a dict, not an object - use dict access
-        balance = info.get('balance', 'N/A')
+        if account:
+            await update.message.reply_text("✅ Connected to broker.\nTrading: " + ("Active" if is_active else "Paused"))
+        else:
+            await update.message.reply_text("Not connected.")
     except Exception as e:
-        logger.error(f"get_account_information failed: {e}")
-        balance = 'N/A'
-
-    try:
-        positions = await connection.get_positions()
-        pos_count = len(positions)
-    except Exception as e:
-        logger.error(f"get_positions failed: {e}")
-        pos_count = 'N/A'
-
-    await update.message.reply_text(f"Balance: ${balance}\nPositions: {pos_count}")
-
-async def get_rpc_connection(acct):
-    """
-    Version-tolerant connection setup. The metaapi_cloud_sdk connection API
-    has changed across versions:
-      - newer SDKs:  conn = acct.get_rpc_connection(); await conn.connect()
-      - older SDKs:  conn = await acct.connect()
-    Try the current API first, fall back to the older one, and log available
-    methods if neither exists so we can pin down the exact version in use.
-    """
-    if hasattr(acct, 'get_rpc_connection'):
-        conn = acct.get_rpc_connection()
-        if asyncio.iscoroutine(conn):
-            conn = await conn
-        await conn.connect()
-        return conn
-    elif hasattr(acct, 'connect'):
-        conn = await acct.connect()
-        return conn
-    else:
-        methods = [m for m in dir(acct) if 'connect' in m.lower()]
-        logger.error(f"No known connection method found. Available connect-like methods: {methods}")
-        raise AttributeError("No compatible connection method on account object")
+        await update.message.reply_text(f"Status OK. Error details: {str(e)[:100]}")
 
 async def main():
-    global account, connection
+    global account
     try:
         api = MetaApi(METAAPI_TOKEN)
         account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
-
-        # Make sure the MetaTrader terminal is deployed and running
-        if account.state not in ('DEPLOYING', 'DEPLOYED'):
-            logger.info("Deploying account...")
-            await account.deploy()
-
-        logger.info("Waiting for broker connection...")
         await account.wait_connected()
-
-        connection = await get_rpc_connection(account)
-        await connection.wait_synchronized()
-
-        logger.info("✅ Connected to MetaApi (RPC)")
+        logger.info("✅ Connected to MetaApi")
     except Exception as e:
         logger.error(f"Connection failed: {e}")
         return
-
 
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -108,36 +58,22 @@ async def main():
     await app.start()
     await app.updater.start_polling()
 
-    stop_event = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    try:
-        loop.add_signal_handler(signal.SIGTERM, stop_event.set)
-        loop.add_signal_handler(signal.SIGINT, stop_event.set)
-    except NotImplementedError:
-        pass  # Windows fallback, not relevant on Railway
+    while True:
+        await asyncio.sleep(60)
 
-    await stop_event.wait()
-
-    logger.info("Shutting down...")
-    await app.updater.stop()
-    await app.stop()
-    await app.shutdown()
-
-# Health check server
+# Health check
 class HealthHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Bot is running")
 
-    def log_message(self, format, *args):
-        pass  # silence noisy access logs
-
 def run_health_server():
-    with socketserver.TCPServer(("", PORT), HealthHandler) as httpd:
+    with socketserver.TCPServer(("", 8000), HealthHandler) as httpd:
         httpd.serve_forever()
 
 if __name__ == "__main__":
     threading.Thread(target=run_health_server, daemon=True).start()
+    signal.signal(signal.SIGTERM, lambda s, f: asyncio.get_event_loop().stop())
     asyncio.run(main())
 
