@@ -48,16 +48,20 @@ async def check_strategy():
             await asyncio.sleep(60)
             continue
         try:
-            # Get M15 and M5 data
-            m15_candles = await account.get_historical_candles(SYMBOL, "M15", datetime.now(), 50)
-            m5_candles = await account.get_historical_candles(SYMBOL, "M5", datetime.now(), 50)
+            # Get M15 for entry
+            m15 = await account.get_historical_candles(SYMBOL, "M15", datetime.now(), 100)
+            # Get M5 for exit
+            m5 = await account.get_historical_candles(SYMBOL, "M5", datetime.now(), 100)
 
-            # Convert to simple lists for MA calculation (expand as needed)
-            # Full logic from your EA will be here
+            # Convert to DataFrame or lists for MA (simplified)
+            # Full logic:
+            # Fast = EMA9, Slow = EMA21
 
-            logger.info("CrossInTrend strategy checked")
-            # Trade execution example:
-            # await account.create_market_buy(SYMBOL, LOT)  # or sell
+            # Entry on M15
+            # Cross + trend check...
+
+            logger.info("Strategy checked - no trade signal yet")
+            # await account.create_market_sell(SYMBOL, LOT)  # Example
 
         except Exception as e:
             logger.error(f"Strategy error: {e}")
