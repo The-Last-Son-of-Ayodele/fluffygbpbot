@@ -48,13 +48,16 @@ async def check_strategy():
             await asyncio.sleep(60)
             continue
         try:
-            # Get data
-            m15 = await account.get_historical_candles(SYMBOL, "M15", datetime.now(), 100)
-            m5 = await account.get_historical_candles(SYMBOL, "M5", datetime.now(), 100)
+            # Get M15 and M5 data
+            m15_candles = await account.get_historical_candles(SYMBOL, "M15", datetime.now(), 50)
+            m5_candles = await account.get_historical_candles(SYMBOL, "M5", datetime.now(), 50)
 
-            # Placeholder for full logic (M15 entry, M5 exit)
-            logger.info("Strategy checked - ready for full implementation")
-            # Full logic will be expanded here
+            # Convert to simple lists for MA calculation (expand as needed)
+            # Full logic from your EA will be here
+
+            logger.info("CrossInTrend strategy checked")
+            # Trade execution example:
+            # await account.create_market_buy(SYMBOL, LOT)  # or sell
 
         except Exception as e:
             logger.error(f"Strategy error: {e}")
@@ -65,7 +68,7 @@ async def main():
     api = MetaApi(METAAPI_TOKEN)
     account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
     await account.wait_connected()
-    logger.info("✅ Connected to MetaApi")
+    logger.info("✅ Connected")
 
     asyncio.create_task(check_strategy())
 
