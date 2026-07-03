@@ -5,7 +5,6 @@ import signal
 import http.server
 import socketserver
 import threading
-from datetime import datetime
 from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -25,7 +24,7 @@ is_active = False
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
     is_active = True
-    await update.message.reply_text("✅ Strategy Activated")
+    await update.message.reply_text("✅ Strategy Activated on GBPUSD")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
@@ -35,7 +34,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
-            await update.message.reply_text("✅ Connected.\nTrading: " + ("Active" if is_active else "Paused"))
+            await update.message.reply_text("✅ Connected to broker.\nTrading: " + ("Active" if is_active else "Paused"))
         else:
             await update.message.reply_text("Not connected.")
     except:
@@ -82,7 +81,7 @@ async def main():
     while True:
         await asyncio.sleep(60)
 
-# Health check
+# Health check for Railway
 class HealthHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
