@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 import logging
@@ -54,6 +53,29 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"Balance: ${balance}\nPositions: {pos_count}")
 
+async def get_rpc_connection(acct):
+    """
+    Version-tolerant connection setup. The metaapi_cloud_sdk connection API
+    has changed across versions:
+      - newer SDKs:  conn = acct.get_rpc_connection(); await conn.connect()
+      - older SDKs:  conn = await acct.connect()
+    Try the current API first, fall back to the older one, and log available
+    methods if neither exists so we can pin down the exact version in use.
+    """
+    if hasattr(acct, 'get_rpc_connection'):
+        conn = acct.get_rpc_connection()
+        if asyncio.iscoroutine(conn):
+            conn = await conn
+        await conn.connect()
+        return conn
+    elif hasattr(acct, 'connect'):
+        conn = await acct.connect()
+        return conn
+    else:
+        methods = [m for m in dir(acct) if 'connect' in m.lower()]
+        logger.error(f"No known connection method found. Available connect-like methods: {methods}")
+        raise AttributeError("No compatible connection method on account object")
+
 async def main():
     global account, connection
     try:
@@ -68,16 +90,14 @@ async def main():
         logger.info("Waiting for broker connection...")
         await account.wait_connected()
 
-        # This is the missing piece: get_account_information() and
-        # get_positions() live on the RPC connection, not on `account`.
-        connection = account.get_rpc_connection()
-        await connection.connect()
+        connection = await get_rpc_connection(account)
         await connection.wait_synchronized()
 
         logger.info("✅ Connected to MetaApi (RPC)")
     except Exception as e:
         logger.error(f"Connection failed: {e}")
         return
+
 
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -120,3 +140,4 @@ def run_health_server():
 if __name__ == "__main__":
     threading.Thread(target=run_health_server, daemon=True).start()
     asyncio.run(main())
+
