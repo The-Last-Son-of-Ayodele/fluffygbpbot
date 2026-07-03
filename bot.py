@@ -1,6 +1,8 @@
 import os
 import asyncio
 import logging
+import signal
+signal.signal(signal.SIGTERM, lambda s, f: asyncio.get_event_loop().stop())
 from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -56,7 +58,25 @@ async def main():
     await app.initialize()
     await app.start()
     await app.updater.start_polling()
+    # Health check to prevent Railway sleep
+import http.server
+import socketserver
+import threading
+
+class HealthHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running")
+
+def run_health_server():
+    with socketserver.TCPServer(("", 8000), HealthHandler) as httpd:
+        httpd.serve_forever()
+
+threading.Thread(target=run_health_server, daemon=True).start()
 
     # Simple keep alive
     while True:
         await asyncio.sleep(60)
+        if __name__ == "__main__":
+    asyncio.run(main())
