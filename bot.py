@@ -5,7 +5,6 @@ import signal
 import http.server
 import socketserver
 import threading
-from datetime import datetime
 from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -25,7 +24,7 @@ is_active = False
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
     is_active = True
-    await update.message.reply_text("✅ Full Strategy Activated on GBPUSD")
+    await update.message.reply_text("✅ Strategy Activated on GBPUSD")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
@@ -45,7 +44,7 @@ async def test_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
             await account.create_market_buy(SYMBOL, LOT)
-            await update.message.reply_text("🟢 Test BUY placed")
+            await update.message.reply_text("🟢 Test BUY placed on GBPUSD")
         else:
             await update.message.reply_text("Not connected.")
     except Exception as e:
@@ -55,7 +54,7 @@ async def test_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
             await account.create_market_sell(SYMBOL, LOT)
-            await update.message.reply_text("🔴 Test SELL placed")
+            await update.message.reply_text("🔴 Test SELL placed on GBPUSD")
         else:
             await update.message.reply_text("Not connected.")
     except Exception as e:
@@ -66,7 +65,7 @@ async def main():
     api = MetaApi(METAAPI_TOKEN)
     account = await api.metatrader_account_api.get_account(ACCOUNT_ID)
     await account.wait_connected()
-    logger.info("✅ Connected")
+    logger.info("✅ Connected to MetaApi")
 
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -82,6 +81,7 @@ async def main():
     while True:
         await asyncio.sleep(60)
 
+# Health check
 class HealthHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
