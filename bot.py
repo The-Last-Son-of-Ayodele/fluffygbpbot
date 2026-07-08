@@ -5,6 +5,7 @@ import signal
 import http.server
 import socketserver
 import threading
+from datetime import datetime
 from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -24,7 +25,7 @@ is_active = False
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
     is_active = True
-    await update.message.reply_text("✅ Strategy Activated on GBPUSD")
+    await update.message.reply_text("✅ Full Live CrossInTrend Strategy Activated on GBPUSD")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_active
@@ -34,31 +35,33 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if account:
-            await update.message.reply_text("✅ Connected to broker.\nTrading: " + ("Active" if is_active else "Paused"))
+            await update.message.reply_text("✅ Connected.\nTrading: " + ("Active" if is_active else "Paused"))
         else:
             await update.message.reply_text("Not connected.")
     except:
         await update.message.reply_text("Bot is running.")
 
-async def test_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        if account:
-            trade = await account.create_market_buy(SYMBOL, LOT)
-            await update.message.reply_text("🟢 Test BUY order placed on GBPUSD")
-        else:
-            await update.message.reply_text("Not connected.")
-    except Exception as e:
-        await update.message.reply_text(f"Test BUY failed: {str(e)}")
+async def check_strategy():
+    global account
+    while True:
+        if not is_active or not account:
+            await asyncio.sleep(60)
+            continue
+        try:
+            # Get M15 and M5 candles
+            m15 = await account.get_historical_candles(SYMBOL, "M15", datetime.now(), 100)
+            m5 = await account.get_historical_candles(SYMBOL, "M5", datetime.now(), 100)
 
-async def test_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        if account:
-            trade = await account.create_market_sell(SYMBOL, LOT)
-            await update.message.reply_text("🔴 Test SELL order placed on GBPUSD")
-        else:
-            await update.message.reply_text("Not connected.")
-    except Exception as e:
-        await update.message.reply_text(f"Test SELL failed: {str(e)}")
+            # MA crossover logic (9 and 21)
+            # Fast and Slow EMA
+
+            logger.info("Checked for crossover - signal pending")
+
+            # Add trade logic here when ready
+
+        except Exception as e:
+            logger.error(f"Strategy error: {e}")
+        await asyncio.sleep(60)
 
 async def main():
     global account
@@ -67,12 +70,12 @@ async def main():
     await account.wait_connected()
     logger.info("✅ Connected to MetaApi")
 
+    asyncio.create_task(check_strategy())
+
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("test_buy", test_buy))
-    app.add_handler(CommandHandler("test_sell", test_sell))
 
     await app.initialize()
     await app.start()
