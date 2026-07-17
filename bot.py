@@ -1,3 +1,4 @@
+
 import os
 import asyncio
 import logging
@@ -8,6 +9,9 @@ import threading
 from metaapi_cloud_sdk import MetaApi
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
